@@ -1,0 +1,262 @@
+.blur-background {
+    filter: blur(5px);
+    transition: filter 0.3s;
+}
+
+.sidebar {
+    padding: 10px;
+    width: 220px;
+    box-shadow: 0px 9px 22px -2px rgba(0, 0, 0, 0.2);
+}
+
+.main-content-wrapper {
+    padding: 0 !important;
+}
+.clickable {
+    cursor: pointer;
+}
+
+.dropdown-menu-project-status {
+    padding: 0;
+}
+.dropdown-menu__item:hover {
+    background: #f8f9fa;
+    user-select: none;
+}
+.dropdown-menu.dropdown-menu-task-status.show {
+    display: flex;
+}
+
+
+.dropdown-menu.dropdown-menu-task-status {
+justify-content: space-evenly;
+width: 240px;
+}
+.project-list-container {
+    overflow-y: auto;
+    max-height: 400px;
+}
+
+.project-list {
+    height: auto;
+}
+.project-list__item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.pagination-list {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    margin:20px 0;
+    list-style: none;
+}
+
+.card.gantt-chart {
+    border-left: 0;
+}
+.gantt-chart {
+    overflow-x: scroll;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    width: 100px;
+    flex: 1;
+}
+
+.js-resizable {
+    touch-action: none;
+    overflow: hidden;
+    touch-action: none;
+    box-sizing: border-box;
+}
+
+.chart-table {
+    margin: 0 !important;
+    width: 400px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+}
+.chart-table .row {
+    margin: 0 !important;
+}
+
+.chart-table-container {
+    overflow: hidden;
+    min-width: 600px;
+    margin: 0;
+    padding: 0 !important;
+}
+
+.chart-table__header-container {
+    height: 40px;
+}
+.chart-table__task-row {
+    height: 30px;
+    flex-direction: row;
+    display: flex;
+}
+.gantt-chart-container {
+    overflow: hidden;
+    padding: 0 !important;
+    width: 1600px;
+    
+}
+
+.header-container {
+    display:flex;
+    flex-direction: row;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    background-color: #f8f9fa;
+}
+.gantt-chart .row {
+    margin: 0 !important;
+}
+.gantt-chart__header-container {
+    height: 20px;
+}
+
+.header-container__item {
+    text-align: center;
+    align-content: center;
+    border-right: 1px solid rgba(0,0,0,.125);
+    font-size: 12px;
+    padding: 0;
+    height: 100%;
+}
+
+.gant-chart__task-cell {
+    border-right: 1px solid rgba(0,0,0,.125);
+    padding:0;
+}
+.header-container__item:last-child {
+    border-right: none;
+}
+
+.chart-table-data-wrapper,
+.gantt-chart-data-wrapper {
+    overflow-y: scroll;
+    max-height: calc(100vh - 218px);
+}
+
+.gantt-chart-data-area {
+    height: auto;
+}
+
+/* .chart-table-data-area {} */
+
+.task-row {
+    border-bottom: 1px solid rgba(0,0,0,.125);
+}
+
+.gantt-chart__task-row {
+    height: 30px;
+    position: relative;
+}
+
+.task-row__item {
+    text-align: center;
+    align-content: center;
+    border-right: 1px solid rgba(0,0,0,.125);
+    padding: 0 !important;
+    height: 100%;
+}
+.task-row__month-col {
+    padding:0;
+    font-size: 12px;;
+}
+.footer {
+    border: solid 1px rgba(0, 0, 0, .125);
+    height: 40px;
+}
+
+.table-row__item {
+    border-right: 1px solid rgba(0, 0, 0, .125);
+    padding: 0;
+    height: 100%;
+    font-size:13px;
+    align-content: center;
+    text-align: center;
+}
+
+.chart-table-btns-wrapper {
+    border-bottom: none;
+}
+
+.chart-table_add-row {
+    font-size: 12px;
+    display: flex;
+    padding: 0 5px;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.chart-table_add-row i {
+    margin-right: 3px;
+}
+
+.chart-table_add-container {
+    display:flex;
+    margin-left:10px;
+
+}
+.add-task-button-container {
+    background: solid 1px rgba(0, 0, 0, .125);
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: solid 1px rgba(0, 0, 0, 0.2);
+
+}
+.chart-table_add-row_add-task::after {
+    content: "";
+    display: block;
+    width: 2px;
+    height: 15px;
+    margin-left: 10px;
+    background-color: #000;
+}
+
+.js-disabled {
+    opacity: 0.5;
+}
+
+.table-row__item:last-child {
+    border-right: none;
+}
+
+.table-assignees-container {
+    padding: 5px;
+    overflow-x: auto;
+}
+
+.dropdown-menu-asssignee__item {
+    font-size: 14px;
+}
+
+.members-list-header {
+    background-color: #f8f9fa;
+}
+
+.members-list-header__item {
+    color: #212529;
+    font-weight: 700;
+}
+
+.member-remove-item {
+    cursor: pointer;
+}
+
+.logout-btn {
+    font-size: 12px;
+    position: absolute;
+    bottom: 20px;
+    margin: 0 auto;
+    width: 150px !important;
+}

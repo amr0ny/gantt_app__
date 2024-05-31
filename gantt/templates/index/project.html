@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+{% block title %} Gantt app {% endblock %}
+{% block context %} {{ context_data|safe }} {% endblock %}
+{% load static %}
+{% block styles %}
+<link rel="stylesheet" type="text/css" href="{% static 'gantt/css/project.css' %}">
+{% endblock %}
+{% block content %}
+    <div class="js-main-container d-flex container-fluid h-100 w-100 m-0 p-0">
+        <div class="nav sidebar p-15 h-100 flex-column bg-primary">
+            <li class="nav-item clickable">
+                <div class="nav-link text-white" id="js-modal-btn-create-project">Создать проект</div>
+            </li>
+            <li class="nav-item clickable">
+                <div class="nav-link text-white" id="js-modal-btn-project-list">Все проекты</div>
+                </li>
+            <li class="nav-item clickable">
+                <div class="nav-link text-white" style="text-wrap: nowrap;" id="js-modal-btn-sidebar-tasks">Мои задачи <span style="font-size: 10px;" class="badge badge-light badge-pill">В разработке</span></div>
+            </li>
+            <div class="container-fluid logout-wrapper">
+                <a class="logout-btn btn btn-light btn-sm" href="/logout/">Выйти из аккаунта</a>
+            </div>
+        </div>
+        <div class="main-content-wrapper d-flex flex-column container-fluid">
+            <div class="d-flex flex-column p-3 h-100 w-100">
+                <div class="header-head">
+                    <!-- TODO js: script add contenteditable="true" and check mark button -->
+                    <div class="container-fluid row">
+                        <div class="col align-items-center d-flex justify-content-start flex-row">
+                            <div class="project-name p-2 d-flex">
+                                <!-- TODO: To fill the value with actual one in js -->
+                                <div class="clickable js-editable js-field p-1 js-project-name" data-field="name" data-entity="project"></div>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn dropdown-toggle js-dropdown-field js-project-status" type="button" data-toggle="dropdown">
+                                <span class="caret"></span></button>
+                                <ul id="js-dropdown-project-status" class="dropdown-menu dropdown-menu-project-status js-editable-dropdown">
+                                    <!-- TODO: Add proper styles-->
+                                    <li class="dropdown-menu-item dropdown-menu__item p-2 list-group-item-info js-dropdown-field-item" data-field="status" data-entity="project" data-value="no status">Не установлен</li>
+                                    <li class="dropdown-menu-item dropdown-menu__item p-2 list-group-item-success js-dropdown-field-item" data-field="status" data-entity="project" data-value="as scheduled">По графику</li>
+                                    <li class="dropdown-menu-item dropdown-menu__item p-2 list-group-item-danger js-dropdown-field-item" data-field="status" data-entity="project" data-value="expired">Просрочен</li>
+                                    <li class="dropdown-menu-item dropdown-menu__item p-2 list-group-item-warning js-dropdown-field-item" data-field="status" data-entity="project" data-value="at risk">Под угрозой</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col d-flex justify-content-end flex-row">
+                            <div class="role-container d-flex align-items-center">
+                                <!-- * Perhaps I will do something with the style -->
+                                <span class="badge badge-light p-3 js-project-role">Владелец проекта</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- TODO: I gotta add tips for some navbar elements -->
+                <div class="navbar">
+                    <ul class="nav nav-tabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active js-navbar-item" data-toggle="tab" href="#js-navbar-chart-tab">Диаграмма</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link js-navbar-item" data-toggle="tab" href="#js-navbar-members-tab">Люди</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="flex-fill d-flex main-content tab-content">
+                    <!-- TODO: Gotta implement API request and tab loading-->
+                    <div id="js-navbar-chart-tab" class="container tab-pane active">
+                        <div class="d-flex chart-wrapper h-100">
+                            <div class="card h-100 chart-table js-resizable">
+                                <div class="container-fluid chart-table-container">
+                                    <div class="row chart-table__header-container header-container">
+                                        <div class="header-container__item col-md-4">Задача</div>
+                                        <div class="header-container__item col-md-3">Исполнитель</div>
+                                        <div class="header-container__item col-md-2">Статус</div>
+                                        <div class="header-container__item col">Начало</div>
+                                        <div class="header-container__item col">Завершение</div>
+                                    </div>
+                                    <div class="chart-table-data-wrapper js-sync-scrollable">
+                                        <div class="chart-table-data-area js-grid-layout-table-container">
+                                            
+                                        </div>
+                                        <div class="chart-table__task-row task-row chart-table-btns-wrapper">
+                                            <div class="header-container__item chart-table_add-container col-md-7">
+                                                <div class="chart-table_add-row chart-table_add-row_add-task js-add-task"><i class="fa fa-plus"></i>Добавить задачу</div>
+                                                <div class="chart-table_add-row chart-table_add-row_add-milestone js-add-milestone">Добавить веху</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex-fill gantt-chart card">
+                                <div class="container-fluid gantt-chart-container">
+                                    <div class="row gantt-chart__header-container header-container js-grid-layout-months">
+                                       <!-- TODO: Further, I gotta replace it with the JS to update this columns comnining with API endpoint sending data of mounths-->
+                                    </div>
+                                    <div class="row gantt-chart__header-container header-container js-grid-layout-days"></div>
+                                    <div class="gantt-chart-data-wrapper js-sync-scrollable">
+                                        <div class="gantt-chart-data-area js-grid-layout-container">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="js-navbar-members-tab" class="container tab-pane fade">
+                        <div class="container-fluid m-2">
+                            <h3>Список участников</h3>
+                            <form class="js-form-member" method="post">    
+                                <div class="form-group d-flex flex-row">
+                                    <label style="width:300px;" class="align-content-center" for="username">Добавить пользователя:</label>
+                                    <input class="form-control flex-fill" type="text" name="username" placeholder="Имя пользователя">
+                                    <input type="hidden" name="role" value="editor">
+                                    <button type="submit" class="btn btn-primary">Добавить</button>
+                                </div>
+                            </form>
+                            <hr>
+                            <div class="d-flex justify-content-center">
+                                <div class="container-fluid members-container">
+                                    <ul class="list-group">
+                                        <li class="list-group-item members-list-header">
+                                            <div class="row">
+                                                <div class="col members-list-header__item">Участник</div>
+                                                <div class="col members-list-header__item">Роль проекте</div>
+                                                <div class="col members-list-header__item">Электронная почта</div>
+                                                <div class="col-md-1"></div>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                    <ul class="js-members-list list-group members-list">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="footer"></div>
+        </div>
+    </div>
+    <div class="js-modal-blur modal fade" id="modal-create-project">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Создайте проект</h4>
+                </div>
+                <!-- TODO: Change class to smth else-->
+                <form class="js-form-project" method="post">
+                    <div class="modal-body">
+                        <div class="form-group row d-flex justify-content-center">
+                            <div class="col">
+                                <label>Название проекта:</label>
+                            </div>
+                            <div class="col">
+                                <input type="text" name="name" autofocus="">
+                            </div>
+                        </div>
+                        <div class="form-group row d-flex justify-content-center">
+                            <div class="col">
+                                <label>Дата начала:</label>
+                            </div>
+                            <div class="col">
+                                <input type="date" name="start_date" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-transparent">
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="js-modal-blur modal fade" id="modal-project-list">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Выберите проект</h4>
+                </div>
+                <div class="modal-body project-list-container">
+                    <ul class="group-list container-fluid project-list js-project-list">
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="js-modal-blur modal fade" id="modal-create-task">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Добавить задачу</h4>
+                </div>
+                <form class="js-form-task" method="post">
+                    <div class="modal-body">
+                        <div class="form-group row d-flex justify-content-center">
+                            <div class="col">
+                                <label>Название задачи:</label>
+                            </div>
+                            <div class="col">
+                                <input type="text" name="name" autofocus="">
+                            </div>
+                        </div>
+                        <div class="form-group row d-flex justify-content-center">
+                            <div class="col">
+                                <label>Дата и время начала:</label>
+                            </div>
+                            <div class="col">
+                                <input type="datetime-local" name="start_datetime" required>
+                            </div>
+                        </div>
+                        <div class="form-group row d-flex justify-content-center">
+                            <div class="col">
+                                <label>Дата и время завершения:</label>
+                            </div>
+                            <div class="col">
+                                <input type="datetime-local" name="end_datetime" required>
+                            </div>
+                        </div>
+                        <input type="hidden" name="type" value="task">
+                    </div>
+                    <div class="modal-footer bg-transparent">
+                        <input type="submit" class="btn btn-primary">Создать</input>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="js-modal-blur modal fade" id="modal-create-milestone">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Добавить веху</h4>
+                </div>
+                <form class="js-form-task" method="post">
+                    <div class="modal-body">
+                        <div class="form-group row d-flex justify-content-center">
+                            <div class="col">
+                                <label>Название вехи:</label>
+                            </div>
+                            <div class="col">
+                                <input type="text" name="name" autofocus="">
+                            </div>
+                        </div>
+                        <div class="form-group row d-flex justify-content-center">
+                            <div class="col">
+                                <label>Дата и время:</label>
+                            </div>
+                            <div class="col">
+                                <input type="datetime-local" name="start_datetime" required>
+                            </div>
+                        </div>
+                        <input type="hidden" name="type" value="milestone">
+                    </div>
+                    <div class="modal-footer bg-transparent">
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+<script type="module" src="{% static 'gantt/js/index.js' %}"></script>
+<script src="{% static 'gantt/js/resizable.js' %}"></script>
+{% endblock %}
