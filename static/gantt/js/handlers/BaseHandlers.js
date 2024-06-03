@@ -16,6 +16,7 @@ export function mixin(BaseClass, ...Mixins) {
     return Mixed;
 }
 
+
 export class BaseHandler {
     constructor(selector, e) {
         this.jsonContextElement = $('#context-data');
@@ -24,6 +25,7 @@ export class BaseHandler {
     }
 
     assignEvent(event) {
+        event.stopPropagation();
         event.target = event.target.closest(this.selector);
         return event;
     }
@@ -41,7 +43,7 @@ export class BaseHandler {
 
     setJsonContext(updates) {
         var scriptElement = $('#context-data');
-        console.log(`UPDATES: ${updates}`)
+        console.log(`setJsonContext: ${new Date().getTime()}`);
         if (scriptElement.length === 0) {
             console.error('Element with id "context-data" not found.');
             return;
@@ -111,9 +113,9 @@ export class BaseRequestEventHandler extends BaseHandler {
             event = this.assignEvent(event);
             const context = this.getContextData(event);
             const data = this.serializeData(context);
-            const args = this.getArgs();
-            this.endpoint = this.getEndpoint();
-            this.request(data, args).then((res) => {
+            const args = this._getArgs(data);
+            this.endpoint = this.getEndpoint(event);
+            this.request(args).then((res) => {
                 this.eventHandler(res, event);
             }).catch((error) => {
                 console.error("Request failed:", error);
@@ -121,13 +123,12 @@ export class BaseRequestEventHandler extends BaseHandler {
         });
     }
 
-    async request(data, args={}) {
+    async request(args={}) {
         const csrftoken = this.getCSRFToken();
         return new Promise((resolve, reject) => {
             $.ajax({
                 type: this.type,
                 url: this.endpoint,
-                data: data,
                 beforeSend: (xhr) => {
                     xhr.setRequestHeader("X-CSRFToken", csrftoken);
                 },
@@ -143,7 +144,7 @@ export class BaseRequestEventHandler extends BaseHandler {
         });
     }
 
-    getEndpoint() {
+    getEndpoint(event) {
         if (this.endpoint === undefined)
             throw new Error('Endpoint must be defined');
         return this.endpoint;
@@ -172,11 +173,17 @@ export class BaseRequestEventHandler extends BaseHandler {
         }
     }
 
-    getArgs() {
+    _getArgs(data) {
+        var args = this.__getArgs();
+        args['data'] = data;
+        return args;
+    }
+
+    __getArgs() {
         throw new Error('Abstract method must be implemented');
     }
 
-    eventHandler(event) {
+    eventHandler(res, event) {
         throw new Error('Abstract method must be implemented');
     }
 
@@ -189,26 +196,31 @@ export class BaseRequestEventHandler extends BaseHandler {
     }
 }
 
-export class BaseGETEventHandler extends BaseHandler {
+//! Change to new signature
+export class BaseGETEventHandler extends BaseRequestEventHandler {
     
-    constructor(selector, e) {
-        super(selector, e);
+    constructor(selector, e, endpoint = undefined) {
+        super(selector, e, 'GET', endpoint);
     }
 
-    _setupEventHandler() {
-        var self = this;
-        $(this.element).on(this.e, (event) => {
-            event.preventDefault();
-            event = self.assignEvent(event);
-            self.eventHandler(event);
-        });
+    __getArgs() {
+        var args = {
+            dataType: 'JSON',
+        }
+        return args;
+    }
+    
+    _getArgs(data) {
+        return this.__getArgs();
+    }
+    getContextData(event) {
+        return;
     }
 
-    // Abstract methods
-    eventHandler(event) {
-        throw new Error('Abstract method must be implemented.');
+    serializeData(context) {
+        return;
     }
-}
+}    
 
 export class BasePOSTEventHandler extends BaseRequestEventHandler {
     constructor(selector, e, endpoint = undefined) {
@@ -233,23 +245,61 @@ export class BasePOSTEventHandler extends BaseRequestEventHandler {
         return formData;
     }
 
-    getArgs() {
+    __getArgs() {
         return {
             contentType: false,  // Не указываем тип контента, чтобы позволить jQuery корректно обработать FormData
             processData: false,
             timeout: 5000,
         };
     }
+}
 
-    // Переопределяем абстрактные методы из BaseRequestEventHandler
-    getContextData(event) {
-        throw new Error('Abstract method must be implemented.');
+export class BaseDLTEventHandler extends BaseRequestEventHandler {
+    constructor(selector, e, endpoint = undefined) {
+        super(selector, e, 'DELETE', endpoint);
     }
 
-    eventHandler(res, event) {
-        throw new Error('Abstract method must be implemented.');
+    serializeData(context) {
+        return;
+    }
+
+    getContextData(event) {
+        return;
+    }
+
+    __getArgs() {
+        return;
+    }
+    _getArgs() {
+        return;
     }
 }
+
+export class BasePATCHEventHandler extends BaseRequestEventHandler {
+    constructor(selector, e, endpoint = undefined) {
+        super(selector, e, 'PATCH', endpoint);
+    }
+
+    __getArgs() {
+        return {
+            contentType: 'application/json',
+        };
+    }
+
+    serializeData(context) {
+        const formData = new FormData();
+        for (let key in context) {
+            if (context.hasOwnProperty(key)) {
+                formData.append(key, context[key]);
+            }
+        }
+        if (!formData.entries().next().done) {
+            throw new Error('FormData is empty.');
+        }
+        return formData;
+    }
+}
+
 
 
 export class BaseDocumentEventHandler extends BaseHandler {
@@ -341,22 +391,24 @@ export class BaseAbbreviatedEventHandler extends BaseHandler {
     }
 }
 
-export class BaseAbbreviatedPOSTEventHandler extends mixin(BasePOSTEventHandler, BaseAbbreviatedEventHandler) {
-    constructor(endpoint = undefined) {
-        super('', '', endpoint);
-    }
-
-    serializeData(context) {
-        if (context === undefined || context === '') {
-            throw new Error('Context data is undefined');
-        }
-        return JSON.stringify(context);
+export class BaseAbbreviatedRequestEventHandler extends mixin(BaseRequestEventHandler, BaseAbbreviatedEventHandler) {
+    constructor(type, endpoint = undefined) {
+        super('', '', type, endpoint);
     }
 
     eventHandler(context) {
-        const data = this.serializeData(context);
-        this.endpoint = this.getEndpoint();
-        this.request(data, 'application/json; charset=UTF-8', false).then(res => this.success(res));
+        return new Promise((resolve, reject)=> {
+            const data = this.serializeData(context);
+            const args = this._getArgs(data);
+            this.endpoint = this.getEndpoint();
+            this.request(args).then((res) => {
+                this.success(res);
+                resolve();
+            }).catch((error) => {
+                console.error("Request failed:", error);
+                reject();
+            });
+        });
     }
 
     success(res) {
@@ -365,3 +417,61 @@ export class BaseAbbreviatedPOSTEventHandler extends mixin(BasePOSTEventHandler,
 }
 
 
+
+export class BaseAbbreviatedPOSTEventHandler extends BaseAbbreviatedRequestEventHandler {
+    constructor(endpoint = undefined) {
+        super('POST', endpoint);
+    }
+
+    __getArgs() {
+        return {
+            contentType: false,
+            processData: false,
+            timeout: 5000,
+        };
+    }
+}
+
+export class BaseAbbreviatedGETEventHandler extends BaseAbbreviatedRequestEventHandler {
+    constructor(endpoint = undefined) {
+        super('GET', endpoint);
+    }
+
+    __getArgs() {
+        return {
+            dataType: 'JSON',
+        }
+    }
+
+    serializeData() {
+        return;
+    }
+}
+
+export class BaseAbbreviatedDLTEventHandler extends BaseAbbreviatedRequestEventHandler {
+    constructor(endpoint = undefined) {
+        super('DELETE', endpoint);
+    }
+
+    __getArgs() {
+        return;
+    }
+
+    serializeData() {
+        return;
+    }
+}
+
+export class BaseAbbreviatedPATCHEventHandler extends BaseAbbreviatedRequestEventHandler {
+    constructor(endpoint = undefined) {
+        super('PATCH', endpoint);
+    }
+
+    __getArgs() {
+        return {
+            contentType: false,
+            processData: false,
+            timeout: 5000,
+        };
+    }
+}

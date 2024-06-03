@@ -139,9 +139,15 @@ width: 240px;
 .chart-table-data-wrapper,
 .gantt-chart-data-wrapper {
     overflow-y: scroll;
+    overflow-x: hidden;
+    min-height: 300px;
     max-height: calc(100vh - 218px);
 }
 
+.assignee-form-container {
+    overflow-y: auto;
+    height: 130px;
+}
 .gantt-chart-data-area {
     height: auto;
 }
@@ -234,8 +240,21 @@ width: 240px;
 .table-assignees-container {
     padding: 5px;
     overflow-x: auto;
+    white-space: nowrap;
 }
 
+.table-assignees-container .badge {
+    margin-right: 5px;
+}
+.table-assignees-container .badge:last-child {
+    margin: 0;
+}
+
+.dropdown-menu-assignee {
+    width: 300px;
+    padding: 15px;
+    height: 250px;
+}
 .dropdown-menu-asssignee__item {
     font-size: 14px;
 }

@@ -3,7 +3,14 @@ import {
     BaseDefaultEventHandler,
     BaseDocumentReadyHandler,
     BaseFormEventHandler,
-    BaseAbbreviatedPOSTEventHandler
+    BaseDLTEventHandler,
+    BaseGETEventHandler,
+    BaseAbbreviatedDLTEventHandler,
+    BasePATCHEventHandler,
+    BaseAbbreviatedPATCHEventHandler,
+    BasePOSTEventHandler,
+    BaseAbbreviatedPOSTEventHandler,
+    BaseAbbreviatedGETEventHandler
 } from './BaseHandlers.js';
 
 
@@ -150,7 +157,7 @@ export class AddTaskEventHandler extends BaseFormEventHandler {
         super(selector);
     }
 
-    getEndpoint() {
+    getEndpoint(event) {
         const jsonContext = this.parseJsonContext();
         const projectId = jsonContext.project.id;
         const endpoint = `/api/v1/projects/${projectId}/tasks/`;
@@ -179,10 +186,11 @@ export class AddTaskEventHandler extends BaseFormEventHandler {
         var gridLayoutTaskLoader = new GridLayoutTaskLoader();
         var editableEventHandler = new EditableEventHandler();
         var dropdownEditableEventHandler = new DropdownEditableEventHandler();
+        var assigneesEventHandler = new TaskAssigneesEventHandler();
         gridLayoutTaskLoader.eventHandler().then(() => {
             editableEventHandler.setupEventHandler();
             dropdownEditableEventHandler.setupEventHandler();
-
+            assigneesEventHandler.setupEventHandler();
         });
         $('#modal-create-task').modal('hide');
     }
@@ -194,7 +202,7 @@ export class AddMemberEventHandler extends BaseFormEventHandler {
         super(selector);
     }
 
-    getEndpoint() {
+    getEndpoint(event) {
         const jsonContext = this.parseJsonContext();
         const projectId = jsonContext.project.id;
         return `/api/v1/projects/${projectId}/members/`;
@@ -205,15 +213,17 @@ export class AddMemberEventHandler extends BaseFormEventHandler {
         abbreviatedNewMemberLoader.eventHandler();
     }
 }
-// !getCSRFToken
+
 export class AbbreviatedContextDataUpdater extends BaseAbbreviatedPOSTEventHandler {
     constructor() {
-        var endpoint = '/api/v1/context/';
-        super(endpoint);
+        super();
     }
 
-    //perhaps something wrong with args
-    getArgs() {
+    serializeData(context) {
+        return JSON.stringify(context);
+    }
+
+    __getArgs() {
         return {
             contentType: "application/json; charset=UTF-8",
             dataType: "JSON",
@@ -221,96 +231,85 @@ export class AbbreviatedContextDataUpdater extends BaseAbbreviatedPOSTEventHandl
         }
     }
 
+    getEndpoint() {
+        var endpoint = '/api/v1/context/';
+        return endpoint;
+    }
+
     success(res) {
+        console.log('Context response', new Date().getTime(), res);
         this.setJsonContext(res);
     }
 }
-// !getCSRFToken
-// TODO Make DELETE And ABBR Delete classes
 /// TODO Add RemoveTaskEventHandler
-export class RemoveMemberEventHandler extends BaseAbbreviatedEventHandler {
-    constructor() {
-        super();
+export class RemoveMemberEventHandler extends BaseDLTEventHandler {
+    constructor(element) {
+        super('', 'click');
+        this.element = element;
     }
 
-    eventHandler(event) {
+    _getElement() {
+        return; 
+    }
+    assignEvent(event) {
+        return event;
+    }
+
+    getEndpoint(event) {
         var target = event.target.closest('.js-member');
         var memeberId = $(target).attr('data-member-id');
         let jsonContext = this.parseJsonContext();
         var projectId = jsonContext.project.id;
         var endpoint = `/api/v1/projects/${projectId}/members/${memeberId}/`;
-        var csrftoken = this.getCSRFToken();
-        $.ajax({
-            type: 'DELETE', 
-            url: endpoint,
-            beforeSend: function(xhr, _settings) {
-                xhr.setRequestHeader("X-CSRFToken", csrftoken);
-            },
-            success: () => this.success(),
-            error: data => console.error(data)
-        });
+        return endpoint;
     }
+
     
-    success() {
+    eventHandler() {
         var membersLoader = new MembersLoader();
         membersLoader.eventHandler();
     }
 
-}  
-// !getCSRFToken
-// TODO Make BasePATCHEventHandler
-export class EditableEventHandler extends BaseAbbreviatedEventHandler {
+}
+
+export class DocumentClickHandler {
     constructor() {
-        super();
-        this.dataFieldName = 'data-field';
         this.documentClickHandlerOn = false;
-        this.currentEditingElement = undefined;
-        this.endpoint = undefined;
+        this.currentEditingElement = null;
     }
 
-    setupDocumentClickEventHandler() {
+    setupDocumentClickEventHandler(callback) {
         if (!this.documentClickHandlerOn) {
             this.documentClickHandlerOn = true;
             $(document).on('click', event => {
                 if (this.currentEditingElement && !$.contains(this.currentEditingElement[0], event.target)) {
-                    this.saveAndDisableEditing(this.currentEditingElement);
+                    callback(this.currentEditingElement);
                     this.currentEditingElement = null;
                 }
             });
         }
     }
 
-    setupEventHandler() {
-        this.setupDocumentClickEventHandler();
-        const editableElement = $('.js-editable');
-        $(editableElement).off('click');
-        this.setupDocumentClickEventHandler();
-        $(editableElement).on('click', event => {
-            const target = event.target;
-            event.stopPropagation(); // Остановка распространения события
-
-            if (this.currentEditingElement && this.currentEditingElement[0] !== target) {
-                this.saveAndDisableEditing(this.currentEditingElement);
-            }
-
-            $(target).attr('contenteditable', 'true').addClass('editing');
-            this.currentEditingElement = $(target);
-
-            // Помещаем курсор в конец текста
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.selectNodeContents(target);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
-        });
+    setCurrentEditingElement(element) {
+        this.currentEditingElement = element;
     }
 
-    saveAndDisableEditing(element) {
+    getCurrentEditingElement() {
+        return this.currentEditingElement;
+    }
+}
+export class EditablePATCHEventHandler extends BaseAbbreviatedPATCHEventHandler {
+    constructor(endpoint = undefined) {
+        super(endpoint);
+        this.dataFieldName = 'data-field';
+    }
+
+    eventHandler(element) {
         element.attr('contenteditable', 'false').removeClass('editing');
         this.endpoint = this.getEndpoint(element);
         const data = this.serializeData(element);
-        this.sendPatchRequest(data, element);
+        var args = this._getArgs(data);
+        this.request(args).then((res) => this.success(res, element));
     }
 
     getEndpoint(element) {
@@ -329,57 +328,82 @@ export class EditableEventHandler extends BaseAbbreviatedEventHandler {
         return endpoint;
     }
 
-    sendPatchRequest(data, element) {
-        if (this.endpoint === undefined) {
-            throw new Error('Endpoint must be defined');
-        }
-        const csrftoken = this.getCSRFToken();
-        $.ajax({
-            type: 'PATCH',
-            url: this.endpoint,
-            method: 'PATCH',
-            contentType: 'application/json',
-            beforeSend: xhr => {
-                xhr.setRequestHeader("X-CSRFToken", csrftoken);
-            },
-            data: JSON.stringify(Object.fromEntries(data)),
-            success: data => this.success(data, element),
-            error: data => console.error(data)
-        });
-    }
-
-    success(data, element) {
-        if ($(element).attr('data-entity') === 'project') {
-        var abbriviatedProjectNameLoader = new AbbreviatedProjectNameLoader();
-        abbriviatedProjectNameLoader.eventHandler(data);
-        }
-        element.attr('contenteditable', 'false').removeClass('editing');
-        this.currentEditingElement = null;
-    }
-
     serializeData(element) {
         const data = {};
+        const formData = new FormData();
         data[$(element).attr(this.dataFieldName)] = $(element).text();
-        return Object.entries(data);
-    }
-
-    getCSRFToken() {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, 10) === 'csrftoken=') {
-                    cookieValue = decodeURIComponent(cookie.substring(10));
-                    break;
-                }
+        for (let key in data) {
+            if (data.hasOwnProperty(key)) {
+                formData.append(key, data[key]);
             }
         }
-        return cookieValue;
+        for (let pair of formData.entries()) {
+            console.log(pair);
+        }
+        return formData;
+    }
+    
+    success(data, element) {
+        if ($(element).attr('data-entity') === 'project') {
+            var abbreviatedProjectNameLoader = new AbbreviatedProjectNameLoader();
+            abbreviatedProjectNameLoader.eventHandler(data);
+        }
+        else {
+            var gridLayoutTaskLoader = new GridLayoutTaskLoader();
+            var editableEventHandler = new EditableEventHandler();
+            var dropdownEditableEventHandler = new DropdownEditableEventHandler();
+            var assigneesEventHandler = new TaskAssigneesEventHandler();
+            var datetimeEventHandler = new TaskDatetimeEventHandler();
+            gridLayoutTaskLoader.eventHandler().then(() => {
+                editableEventHandler.setupEventHandler();
+                dropdownEditableEventHandler.setupEventHandler();
+                assigneesEventHandler.setupEventHandler();
+                datetimeEventHandler.setupEventHandler();
+            });
+        }
     }
 }
-// TODO: Perhaps I can split the renderTableTaskRow
-export class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
+
+
+export class EditableEventHandler extends BaseAbbreviatedEventHandler {
+    constructor() {
+        super();
+        this.dataFieldName = 'data-field';
+        this.documentClickHandler = new DocumentClickHandler();
+        this.editablePATCHEventHandler = new EditablePATCHEventHandler();
+    }
+
+    setupEventHandler() {
+        this.documentClickHandler.setupDocumentClickEventHandler(element => {
+            this.editablePATCHEventHandler.eventHandler(element);
+        });
+
+        const editableElement = $('.js-editable');
+        $(editableElement).off('click');
+        $(editableElement).on('click', event => {
+            const target = event.target;
+            event.stopPropagation();
+
+            if (this.documentClickHandler.getCurrentEditingElement() && 
+                this.documentClickHandler.getCurrentEditingElement()[0] !== target) {
+                this.editablePATCHEventHandler.saveAndDisableEditing(this.documentClickHandler.getCurrentEditingElement());
+            }
+
+            $(target).attr('contenteditable', 'true').addClass('editing');
+            this.documentClickHandler.setCurrentEditingElement($(target));
+
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(target);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        });
+    }
+}
+
+
+class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
     constructor(data, task, dateObject) {
         super();
         this.task = task;
@@ -388,66 +412,46 @@ export class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
         this.chartLayoutContainer = $('.gantt-chart-container');
         this.gridLayoutContainer = $('.js-grid-layout-container');
         this.gridTableContainer = $('.js-grid-layout-table-container');
-        var jsonContext = this.parseJsonContext();
-        this.statuses = jsonContext.content.task_statuses;
 
-        if (!this.task || !this.dateObject) {
-            throw new Error('Some of the elements are undefined');
+        if (!this.task || !this.dateObject || !data) {
+            throw new Error('Invalid input: Task, DateObject, or Data is undefined');
         }
+
         if (!this.chartLayoutContainer.length || !this.gridLayoutContainer.length || !this.gridTableContainer.length) {
-            throw new Error('Elements are unavailable');
+            throw new Error('Required DOM elements are unavailable');
         }
+
+        const jsonContext = this.parseJsonContext();
+        this.statuses = jsonContext.content.task_statuses || {};
     }
-    
+
 
     calculateItemPosition(startDate, endDate, itemWidth) {
-        const dateObject = this.dateObject;
-        let startOffset = 0;
-        let endOffset = 0;
-        let startMonthFound = false;
-        let endMonthFound = false;
-    
-        for (const monthObj of dateObject) {
-            // Calculate start offset
-            if (!startMonthFound) {
-                if (monthObj.month === (startDate.getMonth() + 1) && monthObj.year === startDate.getFullYear()) {
-                    startOffset += startDate.getDate() - 1;
-                    startMonthFound = true;
-                } else {
-                    startOffset += monthObj.days;
-                }
-            }
-    
-            // Calculate end offset
-            if (!endMonthFound) {
-                if (monthObj.month === (endDate.getMonth() + 1) && monthObj.year === endDate.getFullYear()) {
-                    endOffset += endDate.getDate() - 1;
-                    endMonthFound = true;
-                } else {
-                    endOffset += monthObj.days;
-                }
-            }
-    
-            // Exit loop if both start and end offsets are found
-            if (startMonthFound && endMonthFound) {
-                break;
-            }
-        }
-    
+        const startOffset = this.calculateOffset(startDate);
+        const endOffset = this.calculateOffset(endDate);
+
         const totalDays = endOffset - startOffset + 1;
         const width = totalDays * itemWidth;
         const leftPosition = startOffset * itemWidth;
-    
+
         return [width, leftPosition];
     }
-    
-    
+
+    calculateOffset(date) {
+        let offset = 0;
+        for (const monthObj of this.dateObject) {
+            if (monthObj.month === (date.getMonth() + 1) && monthObj.year === date.getFullYear()) {
+                offset += date.getDate() - 1;
+                break;
+            }
+            offset += monthObj.days;
+        }
+        return offset;
+    }
 
     getColor() {
-        const r = Math.floor(127 + Math.random() * 128).toString(16).padStart(2, '0');
-        const g = Math.floor(127 + Math.random() * 128).toString(16).padStart(2, '0');
-        const b = Math.floor(127 + Math.random() * 128).toString(16).padStart(2, '0');
-        return `#${r}${g}${b}`;
+        const randomColorValue = () => Math.floor(127 + Math.random() * 128).toString(16).padStart(2, '0');
+        return `#${randomColorValue()}${randomColorValue()}${randomColorValue()}`;
     }
 
     renderTaskRow() {
@@ -455,145 +459,319 @@ export class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
         this.renderChartTaskRow();
     }
 
-    renderTableTaskRow() {
-        const task = this.task;
-        var tableRow = $('<div>');
-        var tableTaskCol = $('<div>');
-        var tableAssigneeCol = $('<div>');
-        var tableAssigneeContainer = $('<div>');
-        var assigneeDropdown = $('<div>');
-        var tableAssigneePills = [];
-        var teamMembersElements = [];
-        var tableAssigneeDropdownContainer = $('<div>');
-        var assigneesForm = $('<form>')
-        var tableStatusCol = $('<div>');
-        var statusDropdownMenu = $('<div>');
-        var statusInProgressItem = $('<span>').text('in progress');
-        var statusOpenItem = $('<span>').text('open');
-        var statusClosedItem = $('<span>').text('closed');
-        var statusDoneItem = $('<span>').text('done');
-        var tableBadgeStatus = $('<div>');
-        var tableStartDateCol = $('<div>');
-        var tableEndDateCol = $('<div>');
-    
-        
-
-        if (task.type == 'task') {
-            tableRow.addClass('chart-table__task-row task-row').attr('data-task-id', task.id);
-            tableTaskCol.addClass('table-row__item col-md-4 js-task-col-name js-editable').attr({'data-entity-id': task.id, 'data-field': 'name', 'data-entity': 'task'}).text(task.name);
-            tableAssigneeCol.addClass('table-row__item col-md-3 js-task-col-assignee');
-            tableAssigneeDropdownContainer.addClass('dropdown');
-            tableAssigneeContainer.addClass('table-assignees-container').attr({'data-toggle': 'dropdown'});
-            assigneeDropdown.addClass('dropdown-menu js-editable-dropdown dropdown-menu-assignee');
-
-            task.assignees.forEach(item => {
-                tableAssigneePills.push($('<span>').addClass('badge badge-secondary badge-pill')).text(`${item.person.first_name} ${item.person.last_name}`);
-            });
-            this.data.members.forEach(item => {
-                teamMembersElements.push(
-                    $('<div>').addClass('form-group').append(
-                        $('<input>').attr({'type': 'checkbox', 'name': 'id', 'value': item.person.id, 'id': `task-member-${task.id}-${item.person.id}`}),
-                        $('<label>').attr('for', `task-member-${task.id}-${item.person.id}`).text(`${item.person.first_name} ${item.person.last_name}`),
-                    )
-                );
-            });
-            assigneesForm.append(teamMembersElements);
-            assigneeDropdown.append(assigneesForm);
-            tableAssigneeContainer.append(tableAssigneePills).text(task.assignees.length === 0 ? 'Не назначен' : '');
-            tableAssigneeDropdownContainer.append(tableAssigneeContainer, assigneeDropdown)
-            tableAssigneeCol.append(tableAssigneeDropdownContainer);
-
-            tableStatusCol.addClass('table-row__item col-md-2 js-task-col-status js-dropdown-field');
-            tableBadgeStatus.addClass('badge p-1 js-task-badge').attr({'data-toggle': 'dropdown'}).addClass(this.statuses[task.status]['class']).attr('data-task-id', task.id).text(task.status);
-            statusDropdownMenu.addClass('dropdown-menu js-editable-dropdown dropdown-menu-task-status');
-            statusInProgressItem.addClass('badge badge-warning js-dropdown-field-item').attr({'data-field': 'status', 'data-entity': 'task', 'data-value': 'in progress', 'data-entity-id': task.id});
-            statusOpenItem.addClass('badge badge-primary js-dropdown-field-item').attr({'data-field': 'status', 'data-entity': 'task', 'data-value': 'open', 'data-entity-id': task.id});
-            statusClosedItem.addClass('badge badge-dark js-dropdown-field-item').attr({'data-field': 'status', 'data-entity': 'task', 'data-value': 'closed', 'data-entity-id': task.id});
-            statusDoneItem.addClass('badge badge-success js-dropdown-field-item').attr({'data-field': 'status', 'data-entity': 'task', 'data-value': 'done', 'data-entity-id': task.id});
-            statusDropdownMenu.append([statusInProgressItem, statusOpenItem, statusDoneItem, statusClosedItem]);
-            $(tableStatusCol).append();
-            tableStatusCol.append(
-                $('<div>').addClass('dropdown').append(tableBadgeStatus, statusDropdownMenu)
-            );
-            tableStartDateCol.addClass('table-row__item col js-task-col-start-datetime').attr({'data-entity-id': task.id, 'data-field': 'start_datetime', 'data-entity': 'task'}).text(new Date(task.start_datetime).toISOString().split('T')[0]);
-            tableEndDateCol.addClass('table-row__item col js-task-col-end-datetime').attr({'data-entity-id': task.id, 'data-field': 'end_datetime', 'data-entity': 'task'}).text(new Date(task.end_datetime).toISOString().split('T')[0]);
-        
-        }
-        else if (task.type == 'milestone') {
-            tableRow.addClass('chart-table__task-row task-row').attr('data-task-id', task.id);
-            tableTaskCol.addClass('table-row__item col-md-4 js-task-col-name js-editable').attr({'data-entity-id': task.id, 'data-field': 'name', 'data-entity': 'task'}).text(task.name);
-            tableAssigneeCol.addClass('table-row__item col-md-3 js-task-col-assignee').text(task.assignees.length > 0 ? task.assignees.join(', ') : 'Не назначен');
-            tableStatusCol.addClass('table-row__item col-md-2 js-task-col-status js-dropdown-field').attr({'data-entity-id': task.id, 'data-field': 'status', 'data-entity': 'task'});
-            tableStartDateCol.addClass('table-row__item col js-task-col-start-datetime').attr({'data-entity-id': task.id, 'data-field': 'start_datetime', 'data-entity': 'task'}).text(new Date(task.start_datetime).toISOString().split('T')[0]);
-            tableEndDateCol.addClass('table-row__item col js-disabled ').attr({'data-entity-id': task.id, 'data-field': 'end_endtime', 'data-entity': 'task'}).text(new Date(task.end_datetime).toISOString().split('T')[0]);
-        
-        }
-        $(tableRow).append([tableTaskCol, tableAssigneeCol, tableStatusCol, tableStartDateCol, tableEndDateCol]);
-        $(this.gridTableContainer).append(tableRow);
-    }
-
-    renderChartTaskRow() {
-        const taskRowContainer = $('<div>').addClass('row gantt-chart__task-row task-row').attr('data-task-id', this.task.id);
-        this.dateObject.forEach(monthObj => {
-            const taskColumn = $('<div>').addClass('col task-row__month-col');
-            const taskRow = $('<div>').addClass('row h-100');
-            for (let i = 1; i <= monthObj.days; i++) {
-                $(taskRow).append($('<div>').addClass('task-row__item col'));
-            }
-            $(taskColumn).append(taskRow);
-            $(taskRowContainer).append(taskColumn);
-        });
-        $(this.gridLayoutContainer).append(taskRowContainer);
-    }
-
-    renderTask() {
-        var tableItemWidth = $('.task-row__item').outerWidth();
-        var [width, leftPosition] = this.calculateItemPosition(new Date(this.task.start_datetime), new Date(this.task.end_datetime), tableItemWidth);
-        var taskElement = $('<div>');
-        if (this.task.type == 'milestone') {
-            width = 20;
-            let rot = 45
-            taskElement.addClass('rounded')
-                .css({
-                    position: 'absolute',
-                    marginTop: '5px',
-                    left: `${leftPosition}px`,
-                    width: `${width}px`,
-                    height: `${width}px`,
-                    backgroundColor: '#D33DAF',
-                    boxSizing: 'border-box',
-                    transform: `rotate(-${rot}deg)`
-                })
-            var textElement = $('<div>')
-                .css({
-                    transform: `rotate(${rot}deg) translate(40px, 28px)`,
-                    width: '100px',
-                    fontSize: '75%',
-                    fontWeight: 700
-                })
-                .text(this.task.name);
-            taskElement.append(textElement);
-        }
-        else if (this.task.type == 'task') {
-            taskElement.addClass('badge')
-                .css({
-                    position: 'absolute',
-                    marginTop: '5px',
-                    left: `${leftPosition}px`,
-                    width: `${width}px`,
-                    backgroundColor: this.getColor(),
-                    boxSizing: 'border-box',
-                })
-                .text(this.task.name);
-        }
-        $(`.gantt-chart__task-row[data-task-id="${this.task.id}"]`).append(taskElement);
-    }
-
     eventHandler() {
         this.renderTaskRow();
         this.renderTask();
     }
+
+    createElement(tag, classNames = [], attributes = {}, textContent = '') {
+        const element = $(`<${tag}>`);
+        if (classNames.length) element.addClass(classNames.join(' '));
+        Object.keys(attributes).forEach(attr => element.attr(attr, attributes[attr]));
+        if (textContent) element.text(textContent);
+        return element;
+    }
+
+    renderTableTaskRow() {
+        const task = this.task;
+        const tableRow = this.createElement('div', ['chart-table__task-row', 'task-row'], { 'data-task-id': task.id });
+        const tableTaskCol = this.createElement('div', ['table-row__item', 'col-md-4', 'js-task-col-name', 'js-editable'], { 'data-entity-id': task.id, 'data-field': 'name', 'data-entity': 'task' }, task.name);
+        const tableAssigneeCol = this.createElement('div', ['table-row__item', 'col-md-3', 'js-task-col-assignee']);
+        const tableStatusCol = this.createElement('div', ['table-row__item', 'col-md-2', 'js-task-col-status', 'js-dropdown-field']);
+        const tableStartDateCol = this.createElement('div', ['table-row__item', 'col', 'js-task-col-start-datetime']);
+        const tableEndDateCol = this.createElement('div', ['table-row__item', 'col', 'js-task-col-end-datetime']);
+
+
+        this.renderAssigneeColumn(tableAssigneeCol, task);
+        this.renderStatusColumn(tableStatusCol, task);
+        this.renderStartDatetimeColumn(tableStartDateCol, task);
+        if (task.type === 'task') {
+            this.renderEndDatetimeColumn(tableEndDateCol, task);
+        } else if (task.type === 'milestone') {
+        }
+
+        tableRow.append(tableTaskCol, tableAssigneeCol, tableStatusCol, tableStartDateCol, tableEndDateCol);
+        this.gridTableContainer.append(tableRow);
+    }
+
+    renderAssigneeColumn(column, task) {
+        const tableAssigneeDropdownContainer = this.createElement('div', ['dropdown']);
+        const tableAssigneeContainer = this.createElement('div', ['table-assignees-container'], { 'data-toggle': 'dropdown' });
+        const assigneeDropdown = this.createElement('div', ['dropdown-menu', 'js-editable-dropdown', 'dropdown-menu-assignee']);
+        const tableAssigneeHeader = this.createElement('dt', [], [], 'Участники проекта');
+        const tableHr = this.createElement('hr');
+        const confirmButton = this.createElement('input', ['btn', 'btn-primary', 'btn-sm'], {type: 'submit', value: 'Выбрать'});
+
+        const assigneePills = [];
+        task.assignees.forEach(item => {
+            assigneePills.push(this.createElement('span', ['badge', 'badge-secondary', 'badge-pill'], {}, `${item.first_name} ${item.last_name}`));
+        });
+
+        const createAssigneePills = (assignees) => {
+            return new Promise((resolve, reject) => {
+                try {
+                    const res = assignees.map(item => {
+                        return this.createElement('span', ['badge', 'badge-secondary', 'badge-pill'], {}, `${item.first_name} ${item.last_name}`);
+                    });
+                    resolve(res);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        };
+
+        const teamMembersElements = this.data.members.map(item => {
+            const formGroup = this.createElement('div', ['form-group']);
+            const input = this.createElement('input', [], { 'type': 'checkbox', 'name': 'id', 'value': item.person.id, 'id': `task-member-${task.id}-${item.person.id}`,}).prop('checked', this.task.assignees.some(assignee => assignee.id === item.person.id));
+            const label = this.createElement('label', [], { 'for': `task-member-${task.id}-${item.person.id}` }, `${item.person.first_name} ${item.person.last_name}`);
+            formGroup.append(input, label);
+            return formGroup;
+        });
+
+        const assigneeFormWrapper = this.createElement('div', ['assignee-form-container']);
+        const assigneesForm = this.createElement('form', ['js-assignee-form', 'assignee-form', 'd-flex', 'flex-column'], {'data-task-id': task.id});
+        assigneeFormWrapper.append(teamMembersElements);
+        assigneesForm.append(assigneeFormWrapper, confirmButton);
+        assigneeDropdown.append(tableAssigneeHeader, tableHr, assigneesForm);
+        createAssigneePills(task.assignees).then(assigneePills => {
+            tableAssigneeContainer.append(...assigneePills);
+            if (task.assignees.length === 0) {
+                tableAssigneeContainer.text('Не назначен');
+            }
+        }).catch(error => {
+            console.error('Ошибка при создании Assignee Pills:', error);
+        });
+        tableAssigneeDropdownContainer.append(tableAssigneeContainer, assigneeDropdown);
+        column.append(tableAssigneeDropdownContainer);
+    }
+
+    renderStatusColumn(column, task) {
+        const statusDropdownMenu = this.createElement('div', ['dropdown-menu', 'js-editable-dropdown', 'dropdown-menu-task-status']);
+        const tableBadgeStatus = this.createElement('div', ['badge', 'p-1', 'js-task-badge', this.statuses[task.status]?.['class']], { 'data-toggle': 'dropdown', 'data-task-id': task.id }, task.status);
+
+        const statusOptions = [
+            { status: 'in progress', className: 'badge-warning' },
+            { status: 'open', className: 'badge-primary' },
+            { status: 'closed', className: 'badge-dark' },
+            { status: 'done', className: 'badge-success' }
+        ];
+
+        statusOptions.forEach(option => {
+            const statusItem = this.createElement('span', ['badge', option.className, 'js-dropdown-field-item'], {
+                'data-field': 'status',
+                'data-entity': 'task',
+                'data-value': option.status,
+                'data-entity-id': task.id
+            }, option.status);
+            statusDropdownMenu.append(statusItem);
+        });
+
+        const dropdown = this.createElement('div', ['dropdown']).append(tableBadgeStatus, statusDropdownMenu);
+        column.append(dropdown);
+    }
+
+    formatDateToInputValue(date) {
+        const pad = (num) => String(num).padStart(2, '0');
+    
+        const year = date.getFullYear();
+        const month = pad(date.getMonth() + 1); // Months are zero-based
+        const day = pad(date.getDate());
+        const hours = pad(date.getHours());
+        const minutes = pad(date.getMinutes());
+    
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    renderStartDatetimeColumn(column, task) {
+        const tableDropdownContainer = this.createElement('div', ['dropdown']);
+        const value = this.formatDateToInputValue(new Date(task.start_datetime));
+        const tableStartDatetime = this.createElement('div', [],  {'data-toggle': 'dropdown' }, value.split('T')[0]);
+        const datetimeDropdown = this.createElement('div', ['dropdown-menu', 'js-editable-dropdown', 'dropdown-menu-datetime']);
+
+        const datetimeForm = this.createElement('form', ['js-datetime-form', 'd-flex'], { 'data-task-id': task.id});
+        const datetimeInputDatetime = this.createElement('input', ['form-control'], {'type':'datetime-local', 'value': value, 'name': 'start_datetime'});
+        const confirmButton = this.createElement('input', ['btn', 'btn-primary', 'btn-sm'], {type: 'submit', value: 'Выбрать'});
+
+        datetimeForm.append(datetimeInputDatetime, confirmButton);
+        datetimeDropdown.append(datetimeForm);
+        tableDropdownContainer.append(tableStartDatetime, datetimeDropdown);
+        column.append(tableDropdownContainer);
+    }
+
+    renderEndDatetimeColumn(column, task) {
+        const tableDropdownContainer = this.createElement('div', ['dropdown']);
+        const value = this.formatDateToInputValue(new Date(task.end_datetime));
+        const tableEndDatetime = this.createElement('div', [], { 'data-toggle': 'dropdown' }, value.split('T')[0]);
+
+        const datetimeDropdown = this.createElement('div', ['dropdown-menu', 'dropdown-menu-datetime']);
+
+        const datetimeForm = this.createElement('form', ['js-datetime-form', 'd-flex'], { 'data-task-id': task.id});
+        const datetimeInputDatetime = this.createElement('input', ['form-control'], {'type':'datetime-local', 'value': value, 'name':'end_datetime'});
+        const confirmButton = this.createElement('input', ['btn', 'btn-primary', 'btn-sm'], {type: 'submit', value: 'Выбрать'});
+
+        datetimeForm.append(datetimeInputDatetime, confirmButton);
+        datetimeDropdown.append(datetimeForm);
+        tableDropdownContainer.append(tableEndDatetime, datetimeDropdown);
+        column.append(tableDropdownContainer);
+    }
+
+    renderChartTaskRow() {
+        const taskRowContainer = this.createElement('div', ['row', 'gantt-chart__task-row', 'task-row'], { 'data-task-id': this.task.id });
+
+        this.dateObject.forEach(monthObj => {
+            const taskColumn = this.createElement('div', ['col', 'task-row__month-col']);
+            const taskRow = this.createElement('div', ['row', 'h-100']);
+            for (let i = 1; i <= monthObj.days; i++) {
+                taskRow.append(this.createElement('div', ['task-row__item', 'col']));
+            }
+            taskColumn.append(taskRow);
+            taskRowContainer.append(taskColumn);
+        });
+
+        this.gridLayoutContainer.append(taskRowContainer);
+    }
+
+    renderTask() {
+        const tableItemWidth = $('.task-row__item').outerWidth();
+        const [width, leftPosition] = this.calculateItemPosition(new Date(this.task.start_datetime), new Date(this.task.end_datetime), tableItemWidth);
+        const taskElement = this.createElement('div', ['badge'], undefined, this.task.name);
+        if (this.task.type === 'milestone') {
+            this.renderMilestoneTask(taskElement, width, leftPosition);
+        } else if (this.task.type === 'task') {
+            this.renderRegularTask(taskElement, width, leftPosition);
+        }
+
+        $(`.gantt-chart__task-row[data-task-id="${this.task.id}"]`).append(taskElement);
+    }
+
+    renderMilestoneTask(element, width, leftPosition) {
+        const rotation = 45;
+        width = 25;
+        element.addClass('rounded').css({
+            position: 'absolute',
+            marginTop: '5px',
+            left: `${leftPosition}px`,
+            width: `${width}px`,
+            height: `${width}px`,
+            backgroundColor: '#D33DAF',
+            boxSizing: 'border-box',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            transform: `rotate(-${rotation}deg)`
+        }).text('').append($('<div>').css({
+            transform: `rotate(${rotation}deg)`,
+        }).text(this.task.name));
+    }
+
+    renderRegularTask(element, width, leftPosition) {
+        element.addClass('rounded').css({
+            position: 'absolute',
+            marginTop: '5px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            left: `${leftPosition}px`,
+            width: `${width}px`,
+            backgroundColor: this.getColor()
+        });
+    }
 }
+
+
+export class TaskAssigneesEventHandler extends BasePATCHEventHandler {
+    constructor() {
+        var selector = '.js-assignee-form';
+        super(selector, 'submit');
+    }
+
+    getEndpoint(event) {
+        const jsonContext = this.parseJsonContext();
+        const projectId = jsonContext.project.id;
+        const taskId = $(event.target).attr('data-task-id');
+        const endpoint = `/api/v1/projects/${projectId}/tasks/${taskId}/`;
+        return endpoint;
+    }
+
+    getContextData(event) {
+        const target = event.target;
+        const formData = new FormData(target);
+        return formData;
+    }
+
+    serializeData(context) {
+        let data = { assignees: [] };
+        let assignees = [];
+        for (let pair of context.entries()) {
+            assignees.push(Number(pair[1]));
+        }
+        data.assignees = assignees;
+        return JSON.stringify(data);
+
+    }
+
+    eventHandler(res, event) {
+        var target = event.target.closest('.dropdown-menu');
+        $(target).dropdown('toggle');
+        var gridLayoutTaskLoader = new GridLayoutTaskLoader();
+        var editableEventHandler = new EditableEventHandler();
+        var dropdownEditableEventHandler = new DropdownEditableEventHandler();
+        var assigneesEventHandler = new TaskAssigneesEventHandler();
+        var datetimeEventHandler = new TaskDatetimeEventHandler();
+        gridLayoutTaskLoader.eventHandler().then(() => {
+            editableEventHandler.setupEventHandler();
+            dropdownEditableEventHandler.setupEventHandler();
+            assigneesEventHandler.setupEventHandler();
+            datetimeEventHandler.setupEventHandler();
+        });
+    }
+}
+
+
+export class TaskDatetimeEventHandler extends BasePATCHEventHandler {
+    constructor() {
+        var selector = '.js-datetime-form';
+        super(selector, 'submit');
+    }
+
+    getEndpoint(event) {
+        const jsonContext = this.parseJsonContext();
+        const projectId = jsonContext.project.id;
+        const taskId = $(event.target).attr('data-task-id');
+        const endpoint = `/api/v1/projects/${projectId}/tasks/${taskId}/`;
+        return endpoint;
+    }
+
+    getContextData(event) {
+        const target = event.target;
+        const formData = new FormData(target);
+        return formData;
+    }
+
+    serializeData(context) {
+        let data = {};
+        for (let pair of context.entries()) {
+            data[pair[0]]= new Date(pair[1]);
+        }
+        return JSON.stringify(data);
+    }
+
+    eventHandler(res, event) {
+        var target = event.target.closest('.dropdown-menu');
+        $(target).dropdown('toggle');
+        var gridLayoutTaskLoader = new GridLayoutTaskLoader();
+        var editableEventHandler = new EditableEventHandler();
+        var dropdownEditableEventHandler = new DropdownEditableEventHandler();
+        var assigneesEventHandler = new TaskAssigneesEventHandler();
+        var datetimeEventHandler = new TaskDatetimeEventHandler();
+        gridLayoutTaskLoader.eventHandler().then(() => {
+            editableEventHandler.setupEventHandler();
+            dropdownEditableEventHandler.setupEventHandler();
+            assigneesEventHandler.setupEventHandler();
+            datetimeEventHandler.setupEventHandler();
+        });
+    }
+}
+
 
 export class AbbreviatedNewMemberLoader extends BaseAbbreviatedEventHandler {
     constructor(member) {
@@ -604,7 +782,6 @@ export class AbbreviatedNewMemberLoader extends BaseAbbreviatedEventHandler {
 
     eventHandler() {
         var member = this.member;
-        var removeMemberEventHandler = new RemoveMemberEventHandler();
         var listGroupItem = $('<li>').addClass('list-group-item js-member').attr('data-member-id', member.person.id);
         var listItemRow = $('<div>').addClass('row');
         var memberFullName = $('<div>').addClass('col members-list__item js-member-full-name').text(`${member.person.first_name} ${member.person.last_name}`);
@@ -612,53 +789,13 @@ export class AbbreviatedNewMemberLoader extends BaseAbbreviatedEventHandler {
         var memberEmail = $('<div>').addClass('col members-list__item js-member-email').text(`${member.person.email}`);
         var memberRemove = $('<div>').addClass('col-md-1 text-center members-list__item member-remove-item js-remove-member');
         var removeIcon = $('<i>').addClass('fas fa-trash');
-        $(memberRemove).on('click', (event) => {
-            removeMemberEventHandler.eventHandler(event);
-        });
+        var removeMemberEventHandler = new RemoveMemberEventHandler(memberRemove);
+        removeMemberEventHandler.setupEventHandler();
         memberRemove.append(removeIcon);
         listItemRow.append([memberFullName, memberRole, memberEmail, memberRemove]);
         
         listGroupItem.append(listItemRow);
         $(this.membersList).append(listGroupItem);
-    }
-}
-
-// TODO I can come up with the classes: BaseLoader,  BaseDocumentReadyLoader
-export class ProjectListLoader extends BaseDocumentReadyHandler {
-    constructor() {
-        super();
-        this.projectListElement = $('.js-project-list');
-        this.isEmpty = false;
-
-        if (!this.projectListElement.length) {
-            throw new Error('Project list element is unavailable.');
-        }
-    }
-
-    eventHandler() {
-        if (!this.isEmpty) {
-            $.ajax({
-                url: '/api/v1/projects/',
-                type: 'GET',
-                dataType: 'JSON',
-                success: (data) => {
-                    if (data.results) {
-                        const handler = new AbbreviatedProjectListElementHandler();
-                        data.results.forEach(project => {
-                            const listItem = $('<li>').addClass('list-group-item project-list__item js-project-list-item').attr('data-project-id', project.id);
-                            const projectNameSpan = $('<span>').text(project.name);
-                            const projectStartDateSpan = $('<span>').addClass('badge badge-primary').text(project.start_date);
-                            $(listItem).append([projectNameSpan, projectStartDateSpan]);
-                            $(listItem).on('click', (event) => handler.eventHandler(event));
-                            $(this.projectListElement).append(listItem);
-                        });
-                    }
-                },
-                error: (data) => {
-                    console.error(data);
-                }
-            });
-        }
     }
 }
 
@@ -737,6 +874,7 @@ export class AbbreviatedProjectRoleLoader extends BaseAbbreviatedEventHandler {
     }
 }
 
+//! AJAX Request spotted
 export class GridLayoutTaskLoader extends BaseAbbreviatedEventHandler {
     constructor() {
         super();
@@ -861,9 +999,9 @@ export class GridLayoutTaskLoader extends BaseAbbreviatedEventHandler {
     }
 
     eventHandler() {
-        console.log(`parseJsonContext method: ${new Date().getTime()}`);
         const jsonContext = this.parseJsonContext();
         const projectId = jsonContext.project.id;
+        console.log('Layout loader', new Date().getTime(), projectId);
 
         if (!projectId) {
             throw new Error("Context data doesn't contain project id");
@@ -1035,22 +1173,16 @@ class DropdownEditableEventHandler extends BaseAbbreviatedEventHandler {
     }
 }
 
-export class MembersLoader extends BaseAbbreviatedEventHandler {
+export class MembersLoader extends BaseAbbreviatedGETEventHandler {
     constructor() {
         super();
-        let jsonContext = this.parseJsonContext();
-        this.projectId = jsonContext.project.id;
         this.membersContainer = $('.js-members-list');
     }
 
-    eventHandler() {
-        $.ajax({
-            url: `/api/v1/projects/${this.projectId}/members/`,
-            type: 'GET',
-            dataType: 'JSON',
-            success: (data) => this.success(data),
-            error: (data) => console.error(data)
-        });
+    getEndpoint() {
+        let jsonContext = this.parseJsonContext();
+        var projectId = jsonContext.project.id;
+        return `/api/v1/projects/${projectId}/members/`
     }
     success(data) {
         $(this.membersContainer).empty();
@@ -1060,6 +1192,7 @@ export class MembersLoader extends BaseAbbreviatedEventHandler {
         });
     }
 }
+
 
 export class AbbreviatedProjectLoader extends BaseAbbreviatedEventHandler {
     constructor(projectId) {
@@ -1073,6 +1206,8 @@ export class AbbreviatedProjectLoader extends BaseAbbreviatedEventHandler {
         this.membersLoader = new MembersLoader();
         this.editableEventHandler = new EditableEventHandler();
         this.dropdownEditableEventHandler = new DropdownEditableEventHandler();
+        this.assigneesEventHandler = new TaskAssigneesEventHandler();
+        this.datetimeEventHandler = new TaskDatetimeEventHandler();
     }
 
     async saveProjectState(projectId) {
@@ -1097,34 +1232,64 @@ export class AbbreviatedProjectLoader extends BaseAbbreviatedEventHandler {
                 this.syncScrollableEventHandler.setupEventHandler();
                 this.editableEventHandler.setupEventHandler();
                 this.dropdownEditableEventHandler.setupEventHandler();
-                
+                this.assigneesEventHandler.setupEventHandler();
+                this.datetimeEventHandler.setupEventHandler();
             });
         });
-        
     }
 }
 
-export class AbbreviatedProjectListElementHandler extends BaseAbbreviatedEventHandler {
-    constructor() {
-        super();
+export class ProjectListElementHandler extends BaseGETEventHandler {
+    constructor(element) {
+        super('.js-project-list-item', 'click');
+        this.element = element;
     }
 
-    // Event handler method
-    eventHandler(event) {
-        const target = event.target.closest('.js-project-list-item');
+    _getElement() {
+        return;
+    }
+    assignEvent(event) {
+        return event;
+    }
+    getEndpoint(event) {
+        var target = event.target.closest(this.selector);
         const projectId = $(target).attr('data-project-id');
-        const abbreviatedProjectLoader = new AbbreviatedProjectLoader(projectId);
-        $.ajax({
-            url: `/api/v1/projects/${projectId}`,
-            type: 'GET',
-            dataType: 'JSON',
-            success: (data) => {
-                $('#modal-project-list').modal('hide');
-                abbreviatedProjectLoader.eventHandler(data);
-            },
-            error: (error) => {
-                console.error(error);
-            }
+        return `/api/v1/projects/${projectId}/`;
+    }
+
+    eventHandler(res, event) {
+        const abbreviatedProjectLoader = new AbbreviatedProjectLoader(res.id);
+        abbreviatedProjectLoader.eventHandler(res);
+        $('#modal-project-list').modal('hide');
+    }
+}
+
+
+//! AJAX Request spotted
+export class ProjectListLoader extends BaseGETEventHandler {
+    constructor() {
+        let e = 'shown.bs.modal';
+        const selector = '#modal-project-list';
+        const endpoint = '/api/v1/projects/';
+        super(selector, e, endpoint);
+        this.projectListElement = $('.js-project-list');
+        this.isEmpty = false;
+
+        if (!this.projectListElement.length) {
+            throw new Error('Project list element is unavailable.');
+        }
+    }
+
+    eventHandler(res, event) {
+        $(this.projectListElement).empty();
+        res.results.forEach(project => {
+            const listItem = $('<li>').addClass('list-group-item project-list__item js-project-list-item').attr('data-project-id', project.id);
+            const projectNameSpan = $('<span>').text(project.name);
+            const projectStartDateSpan = $('<span>').addClass('badge badge-primary').text(project.start_date);
+            $(listItem).append([projectNameSpan, projectStartDateSpan]);
+            const handler = new ProjectListElementHandler(listItem);
+            handler.setupEventHandler();
+            $(this.projectListElement).append(listItem);
         });
     }
 }

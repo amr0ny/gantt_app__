@@ -102,6 +102,12 @@ class TaskViewSet(ModelViewSet):
         headers = self.get_success_headers(read_serializer.data)
         return Response(read_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
     
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        project = self.get_project_instance()
+        context['project'] = project
+        return context
+        
     def perform_create(self, serializer):
         project = self.get_project_instance()
         serializer.save(project=project)
@@ -123,6 +129,8 @@ class ContextDataUpdateAPIView(APIView):
         updated = {}
         print(updates)
         for key, value in updates.items():
+
+            print(key, value)
             request.session[key] = value
             updated[key] = value
         

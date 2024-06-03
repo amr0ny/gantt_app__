@@ -62,8 +62,8 @@ def index(request):
 
             },
             'roles': {
-                'Admin': {'text': 'Владелец проекта'},
-                'Editor': {'text': 'Участник'},
+                'admin': {'text': 'Владелец проекта'},
+                'editor': {'text': 'Участник'},
             },
             'months':[
                 "Jan", "Feb", "Mar", "Apr", "May", "Jun",

@@ -1,7 +1,10 @@
 from rest_framework import serializers
 from rest_framework.response import Response
 from gantt.models import Project, Person, PersonProject, Task
+from django.db import transaction
 from datetime import datetime
+
+
 class CustomDateTimeField(serializers.DateTimeField):
     def to_internal_value(self, value):
         try:
@@ -14,18 +17,20 @@ class CustomDateTimeField(serializers.DateTimeField):
         # Возвращаем значение в нужном формате
         return value.strftime('%d.%m.%Y, %H:%M')
     
+
 class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
 
-class PersonProjectSerializer(serializers.ModelSerializer):
+
+"""class PersonProjectSerializer(serializers.ModelSerializer):
     person = PersonSerializer()
     role = serializers.CharField(source='get_role_display')
 
     class Meta:
         model = PersonProject
-        fields = ['person', 'role']
+        fields = ['person', 'role']"""
 
 
 class TaskReadSerializer(serializers.ModelSerializer): 
@@ -40,86 +45,57 @@ class TaskWriteSerializer(serializers.ModelSerializer):
     start_datetime = serializers.DateTimeField()
     end_datetime = serializers.DateTimeField()
     status = serializers.ChoiceField(choices=Task.StatusChoices.choices, required=False)
+    assignees = serializers.PrimaryKeyRelatedField(queryset=Person.objects.all(), many=True, required=False)
+
     class Meta:
         model = Task
-        fields = ['id', 'name', 'type', 'start_datetime', 'end_datetime', 'status']
+        fields = ['id', 'name', 'type', 'start_datetime', 'end_datetime', 'status', 'assignees']
 
     def create(self, validated_data):
-        return Task.objects.create(**validated_data)
+        assignees_data = validated_data.pop('assignees', [])
+        task = Task.objects.create(**validated_data)
+        self.update_assignees(task, assignees_data)
+        return task
     
-    
-class MemberWriteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Person
-        fields = ['id', 'username']
+    def update(self, instance, validated_data):
+        assignees_data = validated_data.pop('assignees', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
 
-class MemberReadSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Person
-        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        if assignees_data is not None:
+            self.update_assignees(instance, assignees_data)
 
+        return instance
 
-class PersonProjectReadSerializer(serializers.ModelSerializer):
-    person = MemberReadSerializer()
+    def update_assignees(self, task, assignees_data):
+        with transaction.atomic():
+            project_members = PersonProject.objects.filter(project=task.project).values_list('person_id', flat=True)
+            valid_assignees = [assignee for assignee in assignees_data if assignee.id in project_members]
+            task.assignees.set(valid_assignees)
 
-    class Meta:
-        model = PersonProject
-        fields = ['person', 'role'] 
+    def validate_assignees(self, value):
+        task = self.instance
+        if task:
+            project_members = PersonProject.objects.filter(project=task.project).values_list('person_id', flat=True)
+            for assignee in value:
+                if assignee.id not in project_members:
+                    raise serializers.ValidationError(f"Person with ID {assignee.id} is not a member of the project.")
+        return value
 
-
-class PersonProjectWriteSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(write_only=True)
-    person = MemberReadSerializer(read_only=True)
-
-    class Meta:
-        model = PersonProject
-        fields = ['username', 'person', 'role']
-
-    def create(self, validated_data):
-        username = validated_data.pop('username')
-        try:
-            person = Person.objects.get(username=username)
-        except Person.DoesNotExist:
-            raise serializers.ValidationError({"username": "User with this username does not exist."})
-
-        person_project = PersonProject.objects.create(person=person, **validated_data)
-        return person_project
-
-
-class ProjectReadSerializer(serializers.ModelSerializer):
-    members = PersonProjectSerializer(many=True, read_only=True, source='personproject_set')
-    tasks = TaskReadSerializer(many=True, read_only=True, source='task_set')
-    class Meta:
-        model = Project
-        fields = ['id', 'name', 'start_date', 'status', 'progress', 'creator', 'members', 'tasks']
-
-class ProjectWriteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Project
-        status = serializers.ChoiceField(Project.StatusChoices.choices, required=False)
-        fields = ['id', 'name', 'start_date', 'status']
-
-    def create(self, validated_data):
-        request = self.context.get('request')
-        user = request.user
-        validated_data['creator'] = user
-        project = Project.objects.create(**validated_data)
+   
         
-        # Creating the PersonProject instance with the role of ADMIN
-        PersonProject.objects.create(project=project, person=user, role=PersonProject.RoleChoices.ADMIN)
+class MemberWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Person
+        fields = ['id', 'username']
 
-        return project
-    
 
 class MemberReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Person
         fields = ['id', 'username', 'first_name', 'last_name', 'email']
 
-class MemberWriteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Person
-        fields = ['id', 'username']
 
 class PersonProjectWriteSerializer(serializers.ModelSerializer):
     username = serializers.CharField(write_only=True)
@@ -153,9 +129,36 @@ class PersonProjectWriteSerializer(serializers.ModelSerializer):
         person_project = PersonProject.objects.create(person=person, **validated_data)
         return person_project
 
+
 class PersonProjectReadSerializer(serializers.ModelSerializer):
     person = MemberReadSerializer()
 
     class Meta:
         model = PersonProject
         fields = ['person', 'role']
+
+
+class ProjectReadSerializer(serializers.ModelSerializer):
+    members = PersonProjectReadSerializer(many=True, read_only=True, source='personproject_set')
+    tasks = TaskReadSerializer(many=True, read_only=True, source='task_set')
+    class Meta:
+        model = Project
+        fields = ['id', 'name', 'start_date', 'status', 'progress', 'creator', 'members', 'tasks']
+
+
+class ProjectWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        status = serializers.ChoiceField(Project.StatusChoices.choices, required=False)
+        fields = ['id', 'name', 'start_date', 'status']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user
+        validated_data['creator'] = user
+        project = Project.objects.create(**validated_data)
+        
+        # Creating the PersonProject instance with the role of ADMIN
+        PersonProject.objects.create(project=project, person=user, role=PersonProject.RoleChoices.ADMIN)
+
+        return project
