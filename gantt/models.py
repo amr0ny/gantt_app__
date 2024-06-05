@@ -52,22 +52,16 @@ class Task(UUIDMixin, TimeStampedMixin):
     name = models.CharField('name', max_length=255)
     status = models.TextField('status', choices=StatusChoices.choices, default=StatusChoices.OPEN)
     type = models.TextField('type', choices=TypeChoices.choices)
-    # TODO: Change field `color` to IntegerField and define method to get the color based on integer id
-    # TODO: In script type json tag provide info in colors
-    color = models.IntegerField(default=1);
-    priority = models.TextField('priority', choices=PriorityChoices.choices, default=PriorityChoices.MEDIUM)
+    color = models.CharField(max_length=9);
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     assignees = models.ManyToManyField(Person, related_name='tasks',
                                      limit_choices_to={'projects': project})
     # TODO: probably it's good idea to add field 'subtasks' or smth
-    dependencies = models.ManyToManyField('self', symmetrical=False, blank=True)
     start_datetime = models.DateTimeField('start_datetime')
     end_datetime = models.DateTimeField('end_datetime')
-    # ! Perhaps, I remove 'deadline' field later
-    modified = models.DateTimeField(auto_now=True)
     class Meta:
         db_table = "content\".\"task"
-        ordering = ['start_datetime']
+        ordering = ['created']
         # TODO: Add indices
 
 

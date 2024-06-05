@@ -168,6 +168,7 @@ width: 240px;
     align-content: center;
     border-right: 1px solid rgba(0,0,0,.125);
     padding: 0 !important;
+    width: 30px;
     height: 100%;
 }
 .task-row__month-col {
@@ -233,8 +234,19 @@ width: 240px;
     opacity: 0.5;
 }
 
+.js-task-col-remove {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 .table-row__item:last-child {
     border-right: none;
+}
+
+.task-row__text-container {
+    overflow-x: auto;
+    white-space: nowrap;
 }
 
 .table-assignees-container {
@@ -278,4 +290,8 @@ width: 240px;
     bottom: 20px;
     margin: 0 auto;
     width: 150px !important;
+}
+
+.js-snap-draggable {
+    touch-action: none;
 }

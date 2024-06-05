@@ -24,21 +24,12 @@ class PersonSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'first_name', 'last_name']
 
 
-"""class PersonProjectSerializer(serializers.ModelSerializer):
-    person = PersonSerializer()
-    role = serializers.CharField(source='get_role_display')
-
-    class Meta:
-        model = PersonProject
-        fields = ['person', 'role']"""
-
-
 class TaskReadSerializer(serializers.ModelSerializer): 
     assignees = PersonSerializer(many=True)
 
     class Meta:
         model = Task
-        fields = ['id', 'name', 'type', 'status', 'assignees', 'color', 'priority', 'start_datetime', 'end_datetime', 'modified']
+        fields = ['id', 'name', 'type', 'status', 'assignees', 'color', 'start_datetime', 'end_datetime', 'modified']
 
 
 class TaskWriteSerializer(serializers.ModelSerializer):
@@ -46,10 +37,9 @@ class TaskWriteSerializer(serializers.ModelSerializer):
     end_datetime = serializers.DateTimeField()
     status = serializers.ChoiceField(choices=Task.StatusChoices.choices, required=False)
     assignees = serializers.PrimaryKeyRelatedField(queryset=Person.objects.all(), many=True, required=False)
-
     class Meta:
         model = Task
-        fields = ['id', 'name', 'type', 'start_datetime', 'end_datetime', 'status', 'assignees']
+        fields = ['id', 'name', 'type', 'start_datetime', 'end_datetime', 'status', 'assignees', 'color']
 
     def create(self, validated_data):
         assignees_data = validated_data.pop('assignees', [])

@@ -1,4 +1,5 @@
 import {
+    BaseHandler,
     BaseAbbreviatedEventHandler,
     BaseDefaultEventHandler,
     BaseDocumentReadyHandler,
@@ -10,7 +11,7 @@ import {
     BaseAbbreviatedPATCHEventHandler,
     BasePOSTEventHandler,
     BaseAbbreviatedPOSTEventHandler,
-    BaseAbbreviatedGETEventHandler
+    BaseAbbreviatedGETEventHandler,
 } from './BaseHandlers.js';
 
 
@@ -164,6 +165,16 @@ export class AddTaskEventHandler extends BaseFormEventHandler {
         return endpoint;
     }
 
+    getColor() {
+        const randomColorValue = () => Math.floor(127 + Math.random() * 128).toString(16).padStart(2, '0');
+        return `#${randomColorValue()}${randomColorValue()}${randomColorValue()}`;
+    }
+    getContextData(event) {
+        var context = super.getContextData(event);
+        context.append('color', this.getColor());
+        return context;
+    }
+
     serializeData(context) {
         var formData = context;
         let isEmpty = true;
@@ -187,10 +198,15 @@ export class AddTaskEventHandler extends BaseFormEventHandler {
         var editableEventHandler = new EditableEventHandler();
         var dropdownEditableEventHandler = new DropdownEditableEventHandler();
         var assigneesEventHandler = new TaskAssigneesEventHandler();
+        var datetimeEventHandler = new TaskDatetimeEventHandler();
+        var removeTaskEventHandler = new RemoveTaskEventHandler();
         gridLayoutTaskLoader.eventHandler().then(() => {
+            removeTaskEventHandler.setupEventHandler();
             editableEventHandler.setupEventHandler();
             dropdownEditableEventHandler.setupEventHandler();
             assigneesEventHandler.setupEventHandler();
+            datetimeEventHandler.setupEventHandler();
+            const draggableGridEventHandler = new DraggableGridEventHandler('.js-snap-draggable', $('.task-row__item').outerWidth());
         });
         $('#modal-create-task').modal('hide');
     }
@@ -268,6 +284,39 @@ export class RemoveMemberEventHandler extends BaseDLTEventHandler {
     eventHandler() {
         var membersLoader = new MembersLoader();
         membersLoader.eventHandler();
+    }
+
+}
+
+export class RemoveTaskEventHandler extends BaseDLTEventHandler {
+    constructor() {
+        let selector = '.js-task-col-remove';
+        super(selector, 'click');
+    }
+
+    getEndpoint(event) {
+        var taskId = $(event.target).attr('data-task-id');
+        let jsonContext = this.parseJsonContext();
+        var projectId = jsonContext.project.id;
+        var endpoint = `/api/v1/projects/${projectId}/tasks/${taskId}/`;
+        return endpoint;
+    }
+
+    eventHandler() {
+        var gridLayoutTaskLoader = new GridLayoutTaskLoader();
+        var editableEventHandler = new EditableEventHandler();
+        var dropdownEditableEventHandler = new DropdownEditableEventHandler();
+        var assigneesEventHandler = new TaskAssigneesEventHandler();
+        var datetimeEventHandler = new TaskDatetimeEventHandler();
+        var removeTaskEventHandler = new RemoveTaskEventHandler();
+        gridLayoutTaskLoader.eventHandler().then(() => {
+            removeTaskEventHandler.setupEventHandler();
+            editableEventHandler.setupEventHandler();
+            dropdownEditableEventHandler.setupEventHandler();
+            assigneesEventHandler.setupEventHandler();
+            datetimeEventHandler.setupEventHandler();
+            const draggableGridEventHandler = new DraggableGridEventHandler('.js-snap-draggable', $('.task-row__item').outerWidth());
+        });
     }
 
 }
@@ -354,11 +403,14 @@ export class EditablePATCHEventHandler extends BaseAbbreviatedPATCHEventHandler 
             var dropdownEditableEventHandler = new DropdownEditableEventHandler();
             var assigneesEventHandler = new TaskAssigneesEventHandler();
             var datetimeEventHandler = new TaskDatetimeEventHandler();
+            var removeTaskEventHandler = new RemoveTaskEventHandler();
             gridLayoutTaskLoader.eventHandler().then(() => {
+                removeTaskEventHandler.setupEventHandler();
                 editableEventHandler.setupEventHandler();
                 dropdownEditableEventHandler.setupEventHandler();
                 assigneesEventHandler.setupEventHandler();
                 datetimeEventHandler.setupEventHandler();
+                const draggableGridEventHandler = new DraggableGridEventHandler('.js-snap-draggable', $('.task-row__item').outerWidth());
             });
         }
     }
@@ -449,11 +501,6 @@ class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
         return offset;
     }
 
-    getColor() {
-        const randomColorValue = () => Math.floor(127 + Math.random() * 128).toString(16).padStart(2, '0');
-        return `#${randomColorValue()}${randomColorValue()}${randomColorValue()}`;
-    }
-
     renderTaskRow() {
         this.renderTableTaskRow();
         this.renderChartTaskRow();
@@ -475,13 +522,15 @@ class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
     renderTableTaskRow() {
         const task = this.task;
         const tableRow = this.createElement('div', ['chart-table__task-row', 'task-row'], { 'data-task-id': task.id });
-        const tableTaskCol = this.createElement('div', ['table-row__item', 'col-md-4', 'js-task-col-name', 'js-editable'], { 'data-entity-id': task.id, 'data-field': 'name', 'data-entity': 'task' }, task.name);
+        const tableRemoveCol = this.createElement('div', ['col-md-1', 'js-task-col-remove'], { 'data-task-id': task.id, 'data-entity': 'task' });
+        const tableTaskCol = this.createElement('div', ['table-row__item', 'col-md-3', 'js-task-col-name', 'js-editable'], { 'data-entity-id': task.id, 'data-field': 'name', 'data-entity': 'task' }, undefined);
         const tableAssigneeCol = this.createElement('div', ['table-row__item', 'col-md-3', 'js-task-col-assignee']);
-        const tableStatusCol = this.createElement('div', ['table-row__item', 'col-md-2', 'js-task-col-status', 'js-dropdown-field']);
+        const tableStatusCol = this.createElement('div', ['table-row__item', 'col', 'js-task-col-status', 'js-dropdown-field']);
         const tableStartDateCol = this.createElement('div', ['table-row__item', 'col', 'js-task-col-start-datetime']);
         const tableEndDateCol = this.createElement('div', ['table-row__item', 'col', 'js-task-col-end-datetime']);
 
-
+        this.renderRemoveColumn(tableRemoveCol, task);
+        this.renderNameColumn(tableTaskCol, task);
         this.renderAssigneeColumn(tableAssigneeCol, task);
         this.renderStatusColumn(tableStatusCol, task);
         this.renderStartDatetimeColumn(tableStartDateCol, task);
@@ -490,10 +539,19 @@ class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
         } else if (task.type === 'milestone') {
         }
 
-        tableRow.append(tableTaskCol, tableAssigneeCol, tableStatusCol, tableStartDateCol, tableEndDateCol);
+        tableRow.append(tableRemoveCol, tableTaskCol, tableAssigneeCol, tableStatusCol, tableStartDateCol, tableEndDateCol);
         this.gridTableContainer.append(tableRow);
     }
 
+    renderRemoveColumn(column, task) {
+        const tableRemoveIcon = this.createElement('i', ['fa', 'fa-times']);
+        column.append(tableRemoveIcon);
+    }
+
+    renderNameColumn(column, task) {
+        const tableName = this.createElement('div', ['task-row__text-container'], {}, task.name);
+        column.append(tableName);
+    }
     renderAssigneeColumn(column, task) {
         const tableAssigneeDropdownContainer = this.createElement('div', ['dropdown']);
         const tableAssigneeContainer = this.createElement('div', ['table-assignees-container'], { 'data-toggle': 'dropdown' });
@@ -633,22 +691,23 @@ class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
     renderTask() {
         const tableItemWidth = $('.task-row__item').outerWidth();
         const [width, leftPosition] = this.calculateItemPosition(new Date(this.task.start_datetime), new Date(this.task.end_datetime), tableItemWidth);
-        const taskElement = this.createElement('div', ['badge'], undefined, this.task.name);
+        const taskElement = this.createElement('div', ['badge', 'js-snap-draggable'], {
+            'data-field-start-datetime': new Date(this.task.start_datetime).toISOString(),
+            'data-field-end-datetime': new Date(this.task.end_datetime).toISOString(),
+            'data-task-id': this.task.id,
+        }, this.task.name);
         if (this.task.type === 'milestone') {
             this.renderMilestoneTask(taskElement, width, leftPosition);
         } else if (this.task.type === 'task') {
-            this.renderRegularTask(taskElement, width, leftPosition);
+            this.renderRegularTask(taskElement, width, leftPosition, this.task.color);
         }
-
         $(`.gantt-chart__task-row[data-task-id="${this.task.id}"]`).append(taskElement);
     }
 
     renderMilestoneTask(element, width, leftPosition) {
-        const rotation = 45;
-        width = 25;
+        width = 30;
         element.addClass('rounded').css({
             position: 'absolute',
-            marginTop: '5px',
             left: `${leftPosition}px`,
             width: `${width}px`,
             height: `${width}px`,
@@ -657,13 +716,10 @@ class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            transform: `rotate(-${rotation}deg)`
-        }).text('').append($('<div>').css({
-            transform: `rotate(${rotation}deg)`,
-        }).text(this.task.name));
+        }).text(this.task.name);
     }
 
-    renderRegularTask(element, width, leftPosition) {
+    renderRegularTask(element, width, leftPosition, color) {
         element.addClass('rounded').css({
             position: 'absolute',
             marginTop: '5px',
@@ -672,7 +728,7 @@ class AbbreviatedNewTaskLoader extends BaseAbbreviatedEventHandler {
             alignItems: 'center',
             left: `${leftPosition}px`,
             width: `${width}px`,
-            backgroundColor: this.getColor()
+            backgroundColor: color
         });
     }
 }
@@ -717,11 +773,14 @@ export class TaskAssigneesEventHandler extends BasePATCHEventHandler {
         var dropdownEditableEventHandler = new DropdownEditableEventHandler();
         var assigneesEventHandler = new TaskAssigneesEventHandler();
         var datetimeEventHandler = new TaskDatetimeEventHandler();
+        var removeTaskEventHandler = new RemoveTaskEventHandler();
         gridLayoutTaskLoader.eventHandler().then(() => {
+            removeTaskEventHandler.setupEventHandler();
             editableEventHandler.setupEventHandler();
             dropdownEditableEventHandler.setupEventHandler();
             assigneesEventHandler.setupEventHandler();
             datetimeEventHandler.setupEventHandler();
+            const draggableGridEventHandler = new DraggableGridEventHandler('.js-snap-draggable', $('.task-row__item').outerWidth());
         });
     }
 }
@@ -763,11 +822,14 @@ export class TaskDatetimeEventHandler extends BasePATCHEventHandler {
         var dropdownEditableEventHandler = new DropdownEditableEventHandler();
         var assigneesEventHandler = new TaskAssigneesEventHandler();
         var datetimeEventHandler = new TaskDatetimeEventHandler();
+        var removeTaskEventHandler = new RemoveTaskEventHandler();
         gridLayoutTaskLoader.eventHandler().then(() => {
+            removeTaskEventHandler.setupEventHandler();
             editableEventHandler.setupEventHandler();
             dropdownEditableEventHandler.setupEventHandler();
             assigneesEventHandler.setupEventHandler();
             datetimeEventHandler.setupEventHandler();
+            const draggableGridEventHandler = new DraggableGridEventHandler('.js-snap-draggable', $('.task-row__item').outerWidth());
         });
     }
 }
@@ -875,7 +937,7 @@ export class AbbreviatedProjectRoleLoader extends BaseAbbreviatedEventHandler {
 }
 
 //! AJAX Request spotted
-export class GridLayoutTaskLoader extends BaseAbbreviatedEventHandler {
+class GridLayoutTaskLoader extends BaseAbbreviatedEventHandler {
     constructor() {
         super();
         this.noTasks = false;
@@ -967,8 +1029,14 @@ export class GridLayoutTaskLoader extends BaseAbbreviatedEventHandler {
     setProjectBorders(tasks, dateObject) {
         if (!this.noTasks) {
             const tableItemWidth = $('.task-row__item').outerWidth();
-            const firstTaskDatetime = new Date(tasks[0].start_datetime);
-            const lastTaskDatetime = new Date(tasks[tasks.length - 1].end_datetime);
+            let key = 'start_datetime';
+            const firstTaskDatetime = new Date(tasks.reduce((min, obj) => {
+                return obj[key] < min[key] ? obj : min;
+              }, tasks[0])[key]);
+            key = 'end_datetime';
+            const lastTaskDatetime = new Date(tasks.reduce((max, obj) => {
+                return obj[key] > max[key] ? obj : max;
+              }, tasks[0])[key]);
             const [width, leftPosition] = this.calculateItemPosition(dateObject, firstTaskDatetime, lastTaskDatetime, tableItemWidth);
 
             const projectPeriodElement = $('<div>').css({
@@ -990,7 +1058,7 @@ export class GridLayoutTaskLoader extends BaseAbbreviatedEventHandler {
         this.chartLayoutContainer.css({ width: `${dateObject.length * 30 * 30}px` });
         this.setCalendarGrid(dateObject);
 
-        tasks.forEach(task => {
+        tasks.forEach((task) => {
             const abbreviatedNewTaskLoader = new AbbreviatedNewTaskLoader(data, task, dateObject);
             abbreviatedNewTaskLoader.eventHandler();
         });
@@ -1208,6 +1276,7 @@ export class AbbreviatedProjectLoader extends BaseAbbreviatedEventHandler {
         this.dropdownEditableEventHandler = new DropdownEditableEventHandler();
         this.assigneesEventHandler = new TaskAssigneesEventHandler();
         this.datetimeEventHandler = new TaskDatetimeEventHandler();
+        this.removeTaskEventHandler = new RemoveTaskEventHandler();
     }
 
     async saveProjectState(projectId) {
@@ -1230,10 +1299,12 @@ export class AbbreviatedProjectLoader extends BaseAbbreviatedEventHandler {
             this.gridLayoutLoader.eventHandler().then(() => {
                 this.syncScrollableEventHandler = new SyncScrollableEventHandler();
                 this.syncScrollableEventHandler.setupEventHandler();
+                this.removeTaskEventHandler.setupEventHandler();
                 this.editableEventHandler.setupEventHandler();
                 this.dropdownEditableEventHandler.setupEventHandler();
                 this.assigneesEventHandler.setupEventHandler();
                 this.datetimeEventHandler.setupEventHandler();
+                const draggableGridEventHandler = new DraggableGridEventHandler('.js-snap-draggable', $('.task-row__item').outerWidth());
             });
         });
     }
@@ -1264,7 +1335,6 @@ export class ProjectListElementHandler extends BaseGETEventHandler {
     }
 }
 
-
 //! AJAX Request spotted
 export class ProjectListLoader extends BaseGETEventHandler {
     constructor() {
@@ -1291,5 +1361,145 @@ export class ProjectListLoader extends BaseGETEventHandler {
             handler.setupEventHandler();
             $(this.projectListElement).append(listItem);
         });
+    }
+}
+
+
+export class DraggableGridEventHandler extends BaseHandler {
+    constructor(selector, gridX = 30) {
+        super(selector, 'dragmove');
+        this.gridX = gridX;
+        this.initDraggable();
+    }
+
+    initDraggable() {
+        this.elements = document.querySelectorAll(this.selector);
+        this.elements.forEach(element => {
+            let x = 0;
+
+            // Align initial position to the grid
+            const initialTransform = element.style.transform;
+            const initialMatch = initialTransform.match(/translate\(([^px]*)px, ([^px]*)px\)/);
+            if (initialMatch) {
+                x = parseFloat(initialMatch[1]);
+                x = Math.round(x / this.gridX) * this.gridX; // Align to grid
+                element.style.transform += `translate(${x}px, 0px)`;
+            } else {
+                element.style.transform = `translate(0px, 0px)`;
+            }
+
+            interact(element)
+                .draggable({
+                    modifiers: [
+                        interact.modifiers.snap({
+                            targets: [
+                                interact.createSnapGrid({ x: this.gridX, y: 1 }) // Привязка только по горизонтали
+                            ],
+                            range: Infinity,
+                            relativePoints: [{ x: 0, y: 0 }]
+                        }),
+                        interact.modifiers.restrict({
+                            restriction: element.parentNode,
+                            elementRect: { top: 0, left: 0, bottom: 1, right: 1 },
+                            endOnly: true
+                        })
+                    ],
+                    inertia: true
+                })
+                .on('dragstart', (event) => {
+                    const transform = event.target.style.transform;
+                    const match = transform.match(/translate\(([^px]*)px, ([^px]*)px\)/);
+                    if (match) {
+                        x = parseFloat(match[1]);
+                    } else {
+                        x = 0;
+                    }
+                })
+                .on('dragmove', (event) => {
+                    x += event.dx;
+
+                    const snappedXRel = Math.round(x / this.gridX);
+                    const snappedXAbs = snappedXRel * this.gridX;
+
+
+                    event.target.style.transform = `translate(${snappedXAbs}px, 0px)`;
+                })
+                .on('dragend', (event) => {
+                    const transform = event.target.style.transform;
+                    const match = transform.match(/translate\(([^px]*)px, ([^px]*)px\)/);
+                    let finalX = 0;
+                    if (match) {
+                        finalX = parseFloat(match[1]);
+                    }
+                    const snappedXRel = Math.round(finalX / this.gridX);
+                    var targetStartDatetime = new Date($(event.target).attr('data-field-start-datetime'));
+                    var targetEndDatetime = new Date($(event.target).attr('data-field-end-datetime'));
+                    var taskId = $(event.target).attr('data-task-id');
+                    var projectId = this.parseJsonContext().project.id;
+                    
+                    var data = {'start_datetime': new Date(targetStartDatetime.getFullYear(),
+                                                            targetStartDatetime.getMonth(),
+                                                            targetStartDatetime.getDate()+snappedXRel,
+                                                            targetStartDatetime.getHours(),
+                                                            targetStartDatetime.getMinutes()),
+                                'end_datetime': new Date(targetEndDatetime.getFullYear(),
+                                                            targetEndDatetime.getMonth(),
+                                                            targetEndDatetime.getDate()+snappedXRel,
+                                                            targetEndDatetime.getHours(),
+                                                            targetEndDatetime.getMinutes())}
+                    var csrftoken = this.getCSRFToken();
+                    $.ajax({
+                        url: `api/v1/projects/${projectId}/tasks/${taskId}/`,
+                        type: 'PATCH',
+                        contentType: 'application/json',
+                        data: JSON.stringify(data),
+                        beforeSend: (xhr) => {
+                            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                        },
+                        success: (res) => {
+                            var gridLayoutTaskLoader = new GridLayoutTaskLoader();
+                            var editableEventHandler = new EditableEventHandler();
+                            var dropdownEditableEventHandler = new DropdownEditableEventHandler();
+                            var assigneesEventHandler = new TaskAssigneesEventHandler();
+                            var datetimeEventHandler = new TaskDatetimeEventHandler();
+                            var removeTaskEventHandler = new RemoveTaskEventHandler();
+                            gridLayoutTaskLoader.eventHandler().then(() => {
+                                removeTaskEventHandler.setupEventHandler();
+                                editableEventHandler.setupEventHandler();
+                                dropdownEditableEventHandler.setupEventHandler();
+                                assigneesEventHandler.setupEventHandler();
+                                datetimeEventHandler.setupEventHandler();
+                                const draggableGridEventHandler = new DraggableGridEventHandler('.js-snap-draggable', $('.task-row__item').outerWidth());
+                            });
+                        },
+                        error: (_xhr, textStatus, errorThrown) => {
+                            if (textStatus === "timeout") {
+                                console.error("Request timed out.");
+                            } else {
+                                console.error("Request failed: " + textStatus, errorThrown);
+                            }
+                        }
+                    });
+                });
+
+        });
+    }
+    getCSRFToken() {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, 10) === 'csrftoken=') {
+                    cookieValue = decodeURIComponent(cookie.substring(10));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    eventHandler(event) {
+        // This method could be extended for custom handling.
     }
 }
