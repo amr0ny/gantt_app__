@@ -253,7 +253,6 @@ export class AbbreviatedContextDataUpdater extends BaseAbbreviatedPOSTEventHandl
     }
 
     success(res) {
-        console.log('Context response', new Date().getTime(), res);
         this.setJsonContext(res);
     }
 }
@@ -387,7 +386,6 @@ export class EditablePATCHEventHandler extends BaseAbbreviatedPATCHEventHandler 
             }
         }
         for (let pair of formData.entries()) {
-            console.log(pair);
         }
         return formData;
     }
@@ -1069,8 +1067,6 @@ class GridLayoutTaskLoader extends BaseAbbreviatedEventHandler {
     eventHandler() {
         const jsonContext = this.parseJsonContext();
         const projectId = jsonContext.project.id;
-        console.log('Layout loader', new Date().getTime(), projectId);
-
         if (!projectId) {
             throw new Error("Context data doesn't contain project id");
         }

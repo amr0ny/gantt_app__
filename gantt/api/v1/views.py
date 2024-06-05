@@ -127,14 +127,12 @@ class ContextDataUpdateAPIView(APIView):
 
         updates = request.data
         updated = {}
-        print(updates)
         for key, value in updates.items():
 
             print(key, value)
             request.session[key] = value
             updated[key] = value
         
-        print(updated)
         return Response(updated, status=status.HTTP_200_OK)
     
 
